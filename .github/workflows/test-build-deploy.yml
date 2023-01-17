@@ -31,6 +31,7 @@ jobs:
             - name: Build and test Reach backend (version ${{ matrix.reach_hash }})
               run: |
                   cd reach
+                  REACH_VERSION=${{ matrix.reach_hash }} ./reach run nft-contract
                   cd ..
               env:
                   REACH_CONNECTOR_MODE: ALGO
