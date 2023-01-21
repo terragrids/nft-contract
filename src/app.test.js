@@ -36,6 +36,15 @@ jest.mock('./repository/dynamodb.repository.js', () =>
 import authHandler from './middleware/auth-handler.js'
 jest.mock('./middleware/auth-handler.js')
 
+jest.mock('../reach/nft-contract/build/index.main.mjs', () => jest.fn().mockImplementation(() => ({})))
+
+import { algorandAddressFromCID, cidFromAlgorandAddress } from './utils/token-utils.js'
+
+jest.mock('./utils/token-utils.js', () => ({
+    algorandAddressFromCID: jest.fn().mockImplementation(() => ''),
+    cidFromAlgorandAddress: jest.fn().mockImplementation(() => '')
+}))
+
 describe('app', function () {
     const OLD_ENV = process.env
 
