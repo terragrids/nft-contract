@@ -22,6 +22,7 @@ import NftRepository from './repository/nft.repository.js'
 import ParameterNotValidError from './error/parameter-not-valid.error.js'
 import AlgoIndexer from './provider/algo-indexer.js'
 import NotFoundError from './error/not-found.error.js'
+import { isAdminWallet } from './utils/wallet-utils.js'
 
 dotenv.config()
 export const app = new Koa()
@@ -75,7 +76,7 @@ router.post('/nfts', authHandler, bodyParser(), async ctx => {
     if (ctx.request.body.offChainImageUrl && ctx.request.body.offChainImageUrl.length > 128) throw new ParameterTooLongError('offChainImageUrl')
     const price = parseInt(ctx.request.body.price)
     if (isNaN(price) || price < 0) throw new ParameterNotValidError('price')
-    if (ctx.state.account !== ctx.request.body.creator) throw new UserUnauthorizedError()
+    if (!isAdminWallet(ctx.state.account)) throw new UserUnauthorizedError()
 
     const symbol = ctx.request.body.symbol.toUpperCase()
     const stdlib = new ReachProvider().getStdlib()
@@ -145,9 +146,9 @@ router.post('/nfts', authHandler, bodyParser(), async ctx => {
             fail(e)
         }
 
-        const contractInfo = await promise
+        const contractId = await promise
 
-        ctx.body = { contractInfo, tokenId }
+        ctx.body = { contractId, tokenId }
         ctx.status = 201
     } catch (e) {
         throw new DeployContractError(e)
