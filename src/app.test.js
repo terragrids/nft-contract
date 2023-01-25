@@ -57,6 +57,15 @@ jest.mock('./repository/nft.repository.js', () =>
     }))
 )
 
+const mockAlgoIndexer = {
+    callAlgonodeIndexerEndpoint: jest.fn().mockImplementation(() => jest.fn())
+}
+jest.mock('./provider/algo-indexer.js', () =>
+    jest.fn().mockImplementation(() => ({
+        callAlgonodeIndexerEndpoint: mockAlgoIndexer.callAlgonodeIndexerEndpoint
+    }))
+)
+
 import authHandler from './middleware/auth-handler.js'
 jest.mock('./middleware/auth-handler.js')
 
@@ -688,6 +697,102 @@ describe('app', function () {
             expect(response.body).toEqual({
                 error: 'ParameterNotValidError',
                 message: 'price is not valid'
+            })
+        })
+    })
+
+    describe('get nfts endpoint', function () {
+        it('should return 200 when getting nfts and all is fine', async () => {
+            mockNftRepository.getNfts.mockImplementation(() => ({
+                assets: [
+                    {
+                        id: 1,
+                        name: 'name 1',
+                        status: 'forsale',
+                        offChainImageUrl: 'image_url_1',
+                        created: 'date-1'
+                    },
+                    {
+                        id: 2,
+                        name: 'name 2',
+                        status: 'sold',
+                        offChainImageUrl: 'image_url_2',
+                        created: 'date-2'
+                    },
+                    {
+                        id: 3,
+                        name: 'name 3',
+                        status: 'sold',
+                        offChainImageUrl: 'image_url_3',
+                        created: 'date-3'
+                    }
+                ],
+                nextPageKey: 'next_page_key'
+            }))
+
+            mockAlgoIndexer.callAlgonodeIndexerEndpoint.mockImplementation(params => {
+                const id = parseInt(params.replace('assets/', ''))
+                return Promise.resolve({
+                    status: 200,
+                    json: {
+                        asset: {
+                            index: id,
+                            deleted: id === 2,
+                            params: {
+                                name: `name ${id}`,
+                                total: 1,
+                                decimals: 0,
+                                'unit-name': 'TRLD',
+                                url: 'url',
+                                reserve: 'reserve'
+                            }
+                        }
+                    }
+                })
+            })
+
+            const response = await request(app.callback()).get('/nfts?symbol=trld&sort=asc&status=sold&pageSize=12&nextPageKey=page-key')
+
+            expect(mockNftRepository.getNfts).toHaveBeenCalledTimes(1)
+            expect(mockNftRepository.getNfts).toHaveBeenCalledWith({
+                symbol: 'TRLD',
+                sort: 'asc',
+                status: 'sold',
+                nextPageKey: 'page-key',
+                pageSize: '12'
+            })
+
+            expect(response.status).toBe(200)
+            expect(response.body).toEqual({
+                assets: [
+                    {
+                        id: 1,
+                        name: 'name 1',
+                        status: 'forsale',
+                        offChainImageUrl: 'image_url_1',
+                        created: 'date-1'
+                    },
+                    {
+                        id: 3,
+                        name: 'name 3',
+                        status: 'sold',
+                        offChainImageUrl: 'image_url_3',
+                        created: 'date-3'
+                    }
+                ],
+                nextPageKey: 'next_page_key'
+            })
+        })
+
+        it('should return 400 when getting nfts with no symbol', async () => {
+            const response = await request(app.callback()).get('/nfts?sort=asc&status=sold&pageSize=12&nextPageKey=page-key')
+
+            expect(mockNftRepository.getNfts).not.toHaveBeenCalled()
+
+            expect(response.status).toBe(400)
+            expect(response.body).toEqual({
+                error: 'MissingParameterError',
+                message: 'symbol must be specified'
             })
         })
     })
