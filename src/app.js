@@ -72,7 +72,7 @@ router.post('/nfts', authHandler, bodyParser(), async ctx => {
     if (!ctx.request.body.offChainImageUrl) throw new MissingParameterError('offChainImageUrl')
 
     if (ctx.request.body.name.length > 128) throw new ParameterTooLongError('name')
-    if (ctx.request.body.symbol > 8) throw new ParameterTooLongError('symbol')
+    if (ctx.request.body.symbol.length > 8) throw new ParameterTooLongError('symbol')
     if (ctx.request.body.offChainImageUrl && ctx.request.body.offChainImageUrl.length > 128) throw new ParameterTooLongError('offChainImageUrl')
     const price = parseInt(ctx.request.body.price)
     if (isNaN(price) || price < 0) throw new ParameterNotValidError('price')

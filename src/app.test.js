@@ -582,6 +582,37 @@ describe('app', function () {
             })
         })
 
+        it('should return 400 when nft symbol is missing', async () => {
+            const response = await request(app.callback()).post('/nfts').send({
+                name: 'name',
+                cid: 'cid',
+                offChainImageUrl: 'image_url',
+                price: 123
+            })
+
+            expect(response.status).toBe(400)
+            expect(response.body).toEqual({
+                error: 'MissingParameterError',
+                message: 'symbol must be specified'
+            })
+        })
+
+        it('should return 400 when nft symbol is too long', async () => {
+            const response = await request(app.callback()).post('/nfts').send({
+                symbol: 'aaaaaaaaaa',
+                name: 'name',
+                cid: 'cid',
+                offChainImageUrl: 'image_url',
+                price: 123
+            })
+
+            expect(response.status).toBe(400)
+            expect(response.body).toEqual({
+                error: 'ParameterTooLongError',
+                message: 'symbol is too long'
+            })
+        })
+
         it('should return 400 when nft cid is missing', async () => {
             const response = await request(app.callback()).post('/nfts').send({
                 symbol: 'trld',
@@ -793,6 +824,198 @@ describe('app', function () {
             expect(response.body).toEqual({
                 error: 'MissingParameterError',
                 message: 'symbol must be specified'
+            })
+        })
+    })
+
+    describe('get nft endpoint', function () {
+        it('should return 200 when getting nft and all is fine', async () => {
+            mockNftRepository.getNft.mockImplementation(() => ({
+                id: 1,
+                symbol: 'TRLD',
+                name: 'name',
+                status: 'forsale',
+                offChainImageUrl: 'image_url',
+                created: 'date'
+            }))
+
+            mockAlgoIndexer.callAlgonodeIndexerEndpoint.mockImplementation(params => {
+                switch (params) {
+                    case 'assets/1':
+                        return Promise.resolve({
+                            status: 200,
+                            json: {
+                                asset: {
+                                    index: 1,
+                                    params: {
+                                        name: 'name-from-indexer',
+                                        total: 1,
+                                        decimals: 0,
+                                        'unit-name': 'TRLD',
+                                        url: 'https://terragrids.org#1',
+                                        reserve: 'reserve'
+                                    }
+                                }
+                            }
+                        })
+                    case 'assets/1/balances?currency-greater-than=0':
+                        return Promise.resolve({
+                            status: 200,
+                            json: {
+                                balances: [
+                                    {
+                                        address: 'test_address_1',
+                                        amount: 1,
+                                        deleted: false
+                                    },
+                                    {
+                                        address: 'test_address_2',
+                                        amount: 1,
+                                        deleted: false
+                                    }
+                                ]
+                            }
+                        })
+                }
+            })
+
+            const response = await request(app.callback()).get('/nfts/1')
+
+            expect(mockNftRepository.getNft).toHaveBeenCalledTimes(1)
+            expect(mockNftRepository.getNft).toHaveBeenCalledWith('1')
+
+            expect(response.status).toBe(200)
+            expect(response.body).toEqual({
+                id: 1,
+                symbol: 'TRLD',
+                name: 'name',
+                status: 'forsale',
+                offChainImageUrl: 'image_url',
+                created: 'date',
+                url: 'https://terragrids.org#1',
+                reserve: 'reserve',
+                holders: [
+                    {
+                        address: 'test_address_1',
+                        amount: 1
+                    },
+                    {
+                        address: 'test_address_2',
+                        amount: 1
+                    }
+                ]
+            })
+        })
+
+        it('should return 404 when getting nft and asset not returned by indexer', async () => {
+            mockNftRepository.getNft.mockImplementation(() => ({
+                id: 1,
+                symbol: 'TRLD',
+                name: 'name',
+                status: 'forsale',
+                offChainImageUrl: 'image_url',
+                created: 'date'
+            }))
+
+            mockAlgoIndexer.callAlgonodeIndexerEndpoint.mockImplementation(params => {
+                switch (params) {
+                    case 'assets/1':
+                        return Promise.resolve({
+                            status: 404
+                        })
+                    case 'assets/1/balances?currency-greater-than=0':
+                        return Promise.resolve({
+                            status: 200,
+                            json: {
+                                balances: [
+                                    {
+                                        address: 'test_address_1',
+                                        amount: 1,
+                                        deleted: false
+                                    },
+                                    {
+                                        address: 'test_address_2',
+                                        amount: 1,
+                                        deleted: false
+                                    }
+                                ]
+                            }
+                        })
+                }
+            })
+
+            const response = await request(app.callback()).get('/nfts/1')
+
+            expect(mockNftRepository.getNft).toHaveBeenCalledTimes(1)
+            expect(mockNftRepository.getNft).toHaveBeenCalledWith('1')
+
+            expect(response.status).toBe(404)
+            expect(response.body).toEqual({
+                error: 'NotFoundError',
+                message: 'Item specified not found'
+            })
+        })
+
+        it('should return 404 when getting nft and asset returned deleted by indexer', async () => {
+            mockNftRepository.getNft.mockImplementation(() => ({
+                id: 1,
+                symbol: 'TRLD',
+                name: 'name',
+                status: 'forsale',
+                offChainImageUrl: 'image_url',
+                created: 'date'
+            }))
+
+            mockAlgoIndexer.callAlgonodeIndexerEndpoint.mockImplementation(params => {
+                switch (params) {
+                    case 'assets/1':
+                        return Promise.resolve({
+                            status: 200,
+                            json: {
+                                asset: {
+                                    index: 1,
+                                    deleted: true,
+                                    params: {
+                                        name: 'name-from-indexer',
+                                        total: 1,
+                                        decimals: 0,
+                                        'unit-name': 'TRLD',
+                                        url: 'https://terragrids.org#1',
+                                        reserve: 'reserve'
+                                    }
+                                }
+                            }
+                        })
+                    case 'assets/1/balances?currency-greater-than=0':
+                        return Promise.resolve({
+                            status: 200,
+                            json: {
+                                balances: [
+                                    {
+                                        address: 'test_address_1',
+                                        amount: 1,
+                                        deleted: false
+                                    },
+                                    {
+                                        address: 'test_address_2',
+                                        amount: 1,
+                                        deleted: false
+                                    }
+                                ]
+                            }
+                        })
+                }
+            })
+
+            const response = await request(app.callback()).get('/nfts/1')
+
+            expect(mockNftRepository.getNft).toHaveBeenCalledTimes(1)
+            expect(mockNftRepository.getNft).toHaveBeenCalledWith('1')
+
+            expect(response.status).toBe(404)
+            expect(response.body).toEqual({
+                error: 'NotFoundError',
+                message: 'Item specified not found'
             })
         })
     })
