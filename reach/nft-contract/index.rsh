@@ -16,8 +16,11 @@ export const main = Reach.App(() => {
 
     const M = API('Market', {
         buy: Fun([], Transaction),
-        getToken: Fun([], Token),
         stop: Fun([], Bool)
+    })
+
+    const V = View('View', {
+        token: Token
     })
 
     init()
@@ -35,8 +38,19 @@ export const main = Reach.App(() => {
     A.interact.log('The token is on the market')
 
     const [withdrawn, sold, buyer, paid] = parallelReduce([false, false, A, 0])
+        .define(() => {
+            V.token.set(token)
+        })
         .invariant(balance() == paid && balance(token) == 1)
         .while(!withdrawn && !sold)
+        .api(
+            M.buy,
+            () => price,
+            k => {
+                k([this, price, token])
+                return [false, true, this, price + paid]
+            }
+        )
         .api(
             M.stop,
             () => {
@@ -48,18 +62,6 @@ export const main = Reach.App(() => {
                 require(isAdmin)
                 k(isAdmin)
                 return [true, false, buyer, paid]
-            }
-        )
-        .api(M.getToken, k => {
-            k(token)
-            return [false, false, buyer, paid]
-        })
-        .api(
-            M.buy,
-            () => price,
-            k => {
-                k([this, price, token])
-                return [false, true, this, price + paid]
             }
         )
         .timeout(false)

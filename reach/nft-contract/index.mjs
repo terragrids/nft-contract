@@ -105,6 +105,7 @@ const userConnectAndBuy = async (name, account, contract, gil, ready) => {
         console.log(`${name} is attaching to the contract...`)
         const ctc = account.contract(backend, contract.getInfo())
         const market = ctc.a.Market
+        const view = ctc.v.View
 
         const [algo1, gil1] = await getBalances(account, gil)
 
@@ -113,16 +114,9 @@ const userConnectAndBuy = async (name, account, contract, gil, ready) => {
 
         await ready.wait()
 
-        console.log(`${name} is trying to buy a token...`)
+        const token = (await view.token())[1].toNumber()
 
-        const token = await callAPI(
-            name,
-            () => market.getToken(),
-            `${name} managed to fetch information about the token`,
-            `${name} failed to fetch information about the token, because it is not on the market anymore`
-        )
-
-        if (token) console.log(token)
+        console.log(`${name} is trying to buy the token with ID ${token}`)
 
         await callAPI(name, () => market.buy(), `${name} managed to buy the token`, `${name} failed to buy the token, because it is not on the market anymore`)
 
