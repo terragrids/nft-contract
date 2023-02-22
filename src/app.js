@@ -14,7 +14,7 @@ import MissingParameterError from './error/missing-parameter.error.js'
 import ParameterTooLongError from './error/parameter-too-long.error.js'
 import { UserUnauthorizedError } from './error/user-unauthorized-error.js'
 import { algorandAddressFromCID, cidFromAlgorandAddress } from './utils/token-utils.js'
-import { getJsonStringFromContract, truncateString } from './utils/string-utils.js'
+import { getContractFromJsonString, getJsonStringFromContract, truncateString } from './utils/string-utils.js'
 import MintTokenError from './error/mint-token.error.js'
 import DeployContractError from './error/deploy-contract.error.js'
 import { createPromise } from './utils/promise.js'
@@ -23,6 +23,11 @@ import ParameterNotValidError from './error/parameter-not-valid.error.js'
 import AlgoIndexer from './provider/algo-indexer.js'
 import NotFoundError from './error/not-found.error.js'
 import { isAdminWallet } from './utils/wallet-utils.js'
+import AssetOwnershipError from './error/asset-ownership.error.js'
+import UpdateAssetStatusError from './error/update-asset-status.error.js'
+import ProjectApi from './provider/project-api.js'
+import ReadContractError from './error/read-contract.error.js'
+import { ProjectNotApprovedError } from './error/project-not-approved.error.js'
 
 dotenv.config()
 export const app = new Koa()
@@ -205,6 +210,90 @@ router.get('/nfts/:assetId', async ctx => {
         reserve: indexerResults[0].json.asset.params.reserve,
         holders: indexerResults[1].json.balances.map(balance => ({ address: balance.address, amount: balance.amount }))
     }
+})
+
+/* istanbul ignore next */
+router.put('/nfts/:assetId/purchase', authHandler, bodyParser(), async ctx => {
+    if (!ctx.request.body.projectId) throw new MissingParameterError('projectId')
+
+    const algoIndexer = new AlgoIndexer()
+    const repository = new NftRepository()
+    const projectApi = new ProjectApi()
+    const stdlib = new ReachProvider().getStdlib()
+
+    const [assetResponse, repositoryResponse, projectReponse, algoAccount] = await Promise.all([
+        algoIndexer.callAlgonodeIndexerEndpoint(`assets/${ctx.params.assetId}`),
+        repository.getNft(ctx.params.assetId),
+        projectApi.getProject(ctx.request.body.projectId),
+        stdlib.newAccountFromMnemonic(process.env.ALGO_ACCOUNT_MNEMONIC)
+    ])
+
+    if (assetResponse.status !== 200) {
+        throw new NotFoundError('Asset')
+    }
+
+    if (projectReponse.status !== 200) {
+        throw new NotFoundError('Project')
+    }
+
+    if (!projectReponse.json.approved) {
+        throw new ProjectNotApprovedError()
+    }
+
+    const contractInfo = getContractFromJsonString(repositoryResponse.contractId)
+    let price
+
+    try {
+        const contract = algoAccount.contract(backend, contractInfo)
+        const view = contract.v.View
+        const tokenId = (await view.token())[1].toNumber()
+        if (tokenId !== ctx.params.assetId) throw Error()
+        price = (await view.price())[1]
+    } catch (e) {
+        throw new ReadContractError(e)
+    }
+
+    // Checks all fine, start polling
+
+    try {
+        let retries = 60
+        const { promise, succeed, fail } = createPromise()
+
+        try {
+            // eslint-disable-next-line no-inner-declarations
+            async function checkOwnership() {
+                const balanceResponse = await algoIndexer.callAlgonodeIndexerEndpoint(`assets/${ctx.params.assetId}/balances?currency-greater-than=0`)
+
+                if (balanceResponse.status === 200 && balanceResponse.json.balances[0].address === ctx.state.account) {
+                    succeed()
+                } else if (retries > 0) {
+                    retries--
+                    setTimeout(checkOwnership, 1000)
+                } else {
+                    fail()
+                }
+            }
+            await checkOwnership()
+        } catch (e) {
+            fail(e)
+        }
+
+        await promise
+    } catch (e) {
+        throw new AssetOwnershipError(e)
+    }
+
+    try {
+        const symbol = assetResponse.json.asset.params['unit-name']
+        await repository.updateNft({ assetId: ctx.params.assetId, symbol, status: 'sold' })
+    } catch (e) {
+        throw new UpdateAssetStatusError(e)
+    }
+
+    await new ProjectApi().pay(ctx.request.body.projectId, price)
+
+    ctx.body = ''
+    ctx.status = 204
 })
 
 app.use(requestLogger).use(errorHandler).use(router.routes()).use(router.allowedMethods())

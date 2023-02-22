@@ -20,7 +20,8 @@ export const main = Reach.App(() => {
     })
 
     const V = View('View', {
-        token: Token
+        token: Token,
+        price: UInt
     })
 
     init()
@@ -40,6 +41,7 @@ export const main = Reach.App(() => {
     const [withdrawn, sold, buyer, paid] = parallelReduce([false, false, A, 0])
         .define(() => {
             V.token.set(token)
+            V.price.set(price)
         })
         .invariant(balance() == paid && balance(token) == 1)
         .while(!withdrawn && !sold)

@@ -85,4 +85,21 @@ export default class NftRepository extends DynamoDbRepository {
             else throw e
         }
     }
+
+    async updateNft({ assetId, symbol, status }) {
+        try {
+            const now = Date.now()
+
+            await this.update({
+                key: { pk: { S: `asset|${assetId}` } },
+                attributes: {
+                    ...(status && { '#data': { S: `asset|${symbol}|${status}|${now}` } })
+                },
+                itemLogName: this.itemName
+            })
+        } catch (e) {
+            if (e instanceof ConditionalCheckFailedException) throw new NotFoundError()
+            else throw e
+        }
+    }
 }

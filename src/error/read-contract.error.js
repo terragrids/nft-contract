@@ -1,6 +1,6 @@
 import GenericError from './generic-error.js'
 
-export default class DeployContractError extends GenericError {
+export default class ReadContractError extends GenericError {
     httpCode = 500
     error
 
@@ -11,8 +11,8 @@ export default class DeployContractError extends GenericError {
 
     toJson() {
         return {
-            error: 'DeployContractError',
-            message: 'Unable to deploy nft contract'
+            error: 'ReadContractError',
+            message: 'Unable to read nft contract'
         }
     }
 }

@@ -1,7 +1,7 @@
 import GenericError from './generic-error.js'
 
-export default class DeployContractError extends GenericError {
-    httpCode = 500
+export default class AssetOwnershipError extends GenericError {
+    httpCode = 404
     error
 
     constructor(error) {
@@ -11,8 +11,8 @@ export default class DeployContractError extends GenericError {
 
     toJson() {
         return {
-            error: 'DeployContractError',
-            message: 'Unable to deploy nft contract'
+            error: 'AssetOwnershipError',
+            message: 'Unable to verify asset ownership'
         }
     }
 }

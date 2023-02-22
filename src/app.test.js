@@ -492,7 +492,7 @@ describe('app', function () {
             expect(response.status).toBe(500)
             expect(response.body).toEqual({
                 error: 'DeployContractError',
-                message: 'Unable to deploy project contract'
+                message: 'Unable to deploy nft contract'
             })
         })
 
@@ -524,7 +524,7 @@ describe('app', function () {
             expect(response.status).toBe(500)
             expect(response.body).toEqual({
                 error: 'DeployContractError',
-                message: 'Unable to deploy project contract'
+                message: 'Unable to deploy nft contract'
             })
         })
 
@@ -563,7 +563,7 @@ describe('app', function () {
             expect(response.status).toBe(500)
             expect(response.body).toEqual({
                 error: 'DeployContractError',
-                message: 'Unable to deploy project contract'
+                message: 'Unable to deploy nft contract'
             })
         })
 

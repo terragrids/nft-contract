@@ -115,8 +115,9 @@ const userConnectAndBuy = async (name, account, contract, gil, ready) => {
         await ready.wait()
 
         const token = (await view.token())[1].toNumber()
+        const price = (await view.price())[1]
 
-        console.log(`${name} is trying to buy the token with ID ${token}`)
+        console.log(`${name} is trying to buy the token with ID ${token} for ${fmt(price)}`)
 
         await callAPI(name, () => market.buy(), `${name} managed to buy the token`, `${name} failed to buy the token, because it is not on the market anymore`)
 
