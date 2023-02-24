@@ -1,4 +1,4 @@
-import GenericError from './generic-error.js'
+import GenericError from './generic.error.js'
 
 export class TokenExpiredError extends GenericError {
     httpCode = 401

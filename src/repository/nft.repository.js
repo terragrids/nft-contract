@@ -86,14 +86,20 @@ export default class NftRepository extends DynamoDbRepository {
         }
     }
 
-    async updateNft({ assetId, symbol, status }) {
+    async updateNft({ assetId, symbol, status, purchaseAuth, projectId, walletAddress, positionX, positionY }) {
         try {
             const now = Date.now()
 
             await this.update({
                 key: { pk: { S: `asset|${assetId}` } },
                 attributes: {
-                    ...(status && { '#data': { S: `asset|${symbol}|${status}|${now}` } })
+                    ...(symbol && status && { '#data': { S: `asset|${symbol}|${status}|${now}` } }),
+                    ...(purchaseAuth && { purchaseAuth: { S: purchaseAuth } }),
+                    ...(projectId && { gsi2pk: { S: `project|${projectId}` } }),
+                    ...(walletAddress && { gsi3pk: { S: `user|${walletAddress}` } }),
+                    ...(positionX && { positionX: { N: positionX.toString() } }),
+                    ...(positionY && { positionY: { N: positionY.toString() } }),
+                    ...(status === 'sold' && { sold: { N: now.toString() } })
                 },
                 itemLogName: this.itemName
             })

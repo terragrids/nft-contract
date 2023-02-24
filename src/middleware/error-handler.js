@@ -1,4 +1,4 @@
-import GenericError from '../error/generic-error.js'
+import GenericError from '../error/generic.error.js'
 import Logger from '../logging/logger.js'
 
 export default async function errorHandler(ctx, next) {

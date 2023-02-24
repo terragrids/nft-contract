@@ -1,4 +1,4 @@
-import GenericError from './generic-error.js'
+import GenericError from './generic.error.js'
 
 export default class MissingParameterError extends GenericError {
     httpCode = 400

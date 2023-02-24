@@ -1,4 +1,4 @@
-import GenericError from './generic-error.js'
+import GenericError from './generic.error.js'
 
 export default class NotFoundError extends GenericError {
     httpCode = 404

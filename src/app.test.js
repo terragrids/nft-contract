@@ -78,6 +78,10 @@ jest.mock('./utils/token-utils.js', () => ({
     cidFromAlgorandAddress: jest.fn().mockImplementation(() => '')
 }))
 
+jest.mock('crypto-random-string', () => ({
+    cryptoRandomString: jest.fn().mockImplementation(() => 'crypto-random-string')
+}))
+
 describe('app', function () {
     const OLD_ENV = process.env
 

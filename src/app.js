@@ -12,7 +12,7 @@ import authHandler from './middleware/auth-handler.js'
 import bodyParser from 'koa-bodyparser'
 import MissingParameterError from './error/missing-parameter.error.js'
 import ParameterTooLongError from './error/parameter-too-long.error.js'
-import { UserUnauthorizedError } from './error/user-unauthorized-error.js'
+import { UserUnauthorizedError } from './error/user-unauthorized.error.js'
 import { algorandAddressFromCID, cidFromAlgorandAddress } from './utils/token-utils.js'
 import { getContractFromJsonString, getJsonStringFromContract, truncateString } from './utils/string-utils.js'
 import MintTokenError from './error/mint-token.error.js'
@@ -28,6 +28,10 @@ import UpdateAssetStatusError from './error/update-asset-status.error.js'
 import ProjectApi from './provider/project-api.js'
 import ReadContractError from './error/read-contract.error.js'
 import { ProjectNotApprovedError } from './error/project-not-approved.error.js'
+import PurchaseAuth from './provider/purchase-auth.js'
+import { PurchaseUnauthorizedError } from './error/purchase-unauthorized.error.js'
+import { PurchaseAuthorizationAlreadyIssuedError } from './error/purchase-authorization-expired.error.js'
+import { projectDepositPercentageOfPrice } from './utils/constants.js'
 
 dotenv.config()
 export const app = new Koa()
@@ -213,15 +217,17 @@ router.get('/nfts/:assetId', async ctx => {
 })
 
 /* istanbul ignore next */
-router.put('/nfts/:assetId/purchase', authHandler, bodyParser(), async ctx => {
+router.get('/nfts/:assetId/purchase/auth', authHandler, bodyParser(), async ctx => {
     if (!ctx.request.body.projectId) throw new MissingParameterError('projectId')
+    if (!ctx.request.body.positionX) throw new MissingParameterError('positionX')
+    if (!ctx.request.body.positionY) throw new MissingParameterError('positionY')
 
     const algoIndexer = new AlgoIndexer()
     const repository = new NftRepository()
     const projectApi = new ProjectApi()
     const stdlib = new ReachProvider().getStdlib()
 
-    const [assetResponse, repositoryResponse, projectReponse, algoAccount] = await Promise.all([
+    const [assetResponse, nft, projectReponse, algoAccount] = await Promise.all([
         algoIndexer.callAlgonodeIndexerEndpoint(`assets/${ctx.params.assetId}`),
         repository.getNft(ctx.params.assetId),
         projectApi.getProject(ctx.request.body.projectId),
@@ -240,7 +246,16 @@ router.put('/nfts/:assetId/purchase', authHandler, bodyParser(), async ctx => {
         throw new ProjectNotApprovedError()
     }
 
-    const contractInfo = getContractFromJsonString(repositoryResponse.contractId)
+    const purchaseAuth = new PurchaseAuth()
+
+    if (nft.purchaseAuth) {
+        const authMessage = purchaseAuth.getAuthMessage(nft.purchaseAuth)
+        if (authMessage && ctx.state.account !== authMessage.walletAddress && Date.now() < authMessage.expiry) {
+            throw new PurchaseAuthorizationAlreadyIssuedError()
+        }
+    }
+
+    const contractInfo = getContractFromJsonString(nft.contractId)
     let price
 
     try {
@@ -253,18 +268,43 @@ router.put('/nfts/:assetId/purchase', authHandler, bodyParser(), async ctx => {
         throw new ReadContractError(e)
     }
 
+    const purchaseAuthToken = purchaseAuth.getAuthToken({
+        walletAddress: ctx.state.account,
+        projectId: ctx.request.body.projectId,
+        positionX: ctx.request.body.positionX,
+        positionY: ctx.request.body.positionY,
+        price
+    })
+
+    const symbol = assetResponse.json.asset.params['unit-name']
+    await repository.updateNft({ assetId: ctx.params.assetId, symbol, status: 'forsale-selling', purchaseAuthToken })
+
+    ctx.body = { purchaseAuthToken }
+    ctx.status = 200
+})
+
+/* istanbul ignore next */
+router.put('/nfts/:assetId/purchase', bodyParser(), async ctx => {
+    if (!ctx.request.body.purchaseAuth) throw new MissingParameterError('purchaseAuth')
+
+    const repository = new NftRepository()
+    const asset = await repository.getNft(ctx.params.assetId)
+    if (asset.purchaseAuth !== ctx.request.body.purchaseAuth) throw new PurchaseUnauthorizedError()
+
+    const { walletAddress, projectId, positionX, positionY, price } = new PurchaseAuth().getAuthMessage(asset.purchaseAuth)
+
     // Checks all fine, start polling
 
     try {
-        let retries = 60
+        let retries = 30
         const { promise, succeed, fail } = createPromise()
 
         try {
             // eslint-disable-next-line no-inner-declarations
             async function checkOwnership() {
-                const balanceResponse = await algoIndexer.callAlgonodeIndexerEndpoint(`assets/${ctx.params.assetId}/balances?currency-greater-than=0`)
+                const balanceResponse = await new AlgoIndexer().callAlgonodeIndexerEndpoint(`assets/${ctx.params.assetId}/balances?currency-greater-than=0`)
 
-                if (balanceResponse.status === 200 && balanceResponse.json.balances[0].address === ctx.state.account) {
+                if (balanceResponse.status === 200 && balanceResponse.json.balances[0].address === walletAddress) {
                     succeed()
                 } else if (retries > 0) {
                     retries--
@@ -284,13 +324,22 @@ router.put('/nfts/:assetId/purchase', authHandler, bodyParser(), async ctx => {
     }
 
     try {
-        const symbol = assetResponse.json.asset.params['unit-name']
-        await repository.updateNft({ assetId: ctx.params.assetId, symbol, status: 'sold' })
+        await repository.updateNft({
+            assetId: ctx.params.assetId,
+            symbol: asset.symbol,
+            status: 'sold',
+            purchaseAuth: '.',
+            projectId,
+            walletAddress,
+            positionX,
+            positionY
+        })
     } catch (e) {
         throw new UpdateAssetStatusError(e)
     }
 
-    await new ProjectApi().pay(ctx.request.body.projectId, price)
+    const deposit = Math.round(price * projectDepositPercentageOfPrice)
+    await new ProjectApi().pay(projectId, deposit)
 
     ctx.body = ''
     ctx.status = 204
