@@ -56,7 +56,7 @@ export default class NftRepository extends DynamoDbRepository {
         }
     }
 
-    async getNft(assetId) {
+    async getNft(assetId, withPurchaseAuthToken = false) {
         try {
             const data = await this.get({
                 key: { pk: { S: `asset|${assetId}` } },
@@ -75,7 +75,8 @@ export default class NftRepository extends DynamoDbRepository {
                     ...(data.Item.gsi2pk && { projectId: data.Item.gsi2pk.S.replace('project|', '') }),
                     ...(data.Item.withdrawn && { withdrawn: parseInt(data.Item.withdrawn.N) }),
                     ...(data.Item.positionX && { withdrawn: parseInt(data.Item.positionX.N) }),
-                    ...(data.Item.positionY && { withdrawn: parseInt(data.Item.positionY.N) })
+                    ...(data.Item.positionY && { withdrawn: parseInt(data.Item.positionY.N) }),
+                    ...(withPurchaseAuthToken && data.Item.purchaseAuthToken && { purchaseAuthToken: data.Item.purchaseAuthToken.S })
                 }
             }
 
@@ -86,7 +87,7 @@ export default class NftRepository extends DynamoDbRepository {
         }
     }
 
-    async updateNft({ assetId, symbol, status, purchaseAuth, projectId, walletAddress, positionX, positionY }) {
+    async updateNft({ assetId, symbol, status, purchaseAuthToken, projectId, walletAddress, positionX, positionY }) {
         try {
             const now = Date.now()
 
@@ -94,7 +95,7 @@ export default class NftRepository extends DynamoDbRepository {
                 key: { pk: { S: `asset|${assetId}` } },
                 attributes: {
                     ...(symbol && status && { '#data': { S: `asset|${symbol}|${status}|${now}` } }),
-                    ...(purchaseAuth && { purchaseAuth: { S: purchaseAuth } }),
+                    ...(purchaseAuthToken && { purchaseAuthToken: { S: purchaseAuthToken } }),
                     ...(projectId && { gsi2pk: { S: `project|${projectId}` } }),
                     ...(walletAddress && { gsi3pk: { S: `user|${walletAddress}` } }),
                     ...(positionX && { positionX: { N: positionX.toString() } }),

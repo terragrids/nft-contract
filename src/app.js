@@ -217,7 +217,8 @@ router.get('/nfts/:assetId', async ctx => {
 })
 
 /* istanbul ignore next */
-router.get('/nfts/:assetId/purchase/auth', authHandler, bodyParser(), async ctx => {
+// router.get('/nfts/:assetId/purchase/auth', authHandler, bodyParser(), async ctx => {
+router.get('/nfts/:assetId/purchase/auth', bodyParser(), async ctx => {
     if (!ctx.request.body.projectId) throw new MissingParameterError('projectId')
     if (!ctx.request.body.positionX) throw new MissingParameterError('positionX')
     if (!ctx.request.body.positionY) throw new MissingParameterError('positionY')
@@ -229,7 +230,7 @@ router.get('/nfts/:assetId/purchase/auth', authHandler, bodyParser(), async ctx 
 
     const [assetResponse, nft, projectReponse, algoAccount] = await Promise.all([
         algoIndexer.callAlgonodeIndexerEndpoint(`assets/${ctx.params.assetId}`),
-        repository.getNft(ctx.params.assetId),
+        repository.getNft(ctx.params.assetId, true),
         projectApi.getProject(ctx.request.body.projectId),
         stdlib.newAccountFromMnemonic(process.env.ALGO_ACCOUNT_MNEMONIC)
     ])
@@ -248,8 +249,9 @@ router.get('/nfts/:assetId/purchase/auth', authHandler, bodyParser(), async ctx 
 
     const purchaseAuth = new PurchaseAuth()
 
-    if (nft.purchaseAuth) {
-        const authMessage = purchaseAuth.getAuthMessage(nft.purchaseAuth)
+    if (nft.purchaseAuthToken) {
+        const authMessage = purchaseAuth.getAuthMessage(nft.purchaseAuthToken)
+
         if (authMessage && ctx.state.account !== authMessage.walletAddress && Date.now() < authMessage.expiry) {
             throw new PurchaseAuthorizationAlreadyIssuedError()
         }
@@ -262,7 +264,7 @@ router.get('/nfts/:assetId/purchase/auth', authHandler, bodyParser(), async ctx 
         const contract = algoAccount.contract(backend, contractInfo)
         const view = contract.v.View
         const tokenId = (await view.token())[1].toNumber()
-        if (tokenId !== ctx.params.assetId) throw Error()
+        if (tokenId !== Number(ctx.params.assetId)) throw Error('Contract token not matching')
         price = (await view.price())[1]
     } catch (e) {
         throw new ReadContractError(e)
@@ -273,7 +275,7 @@ router.get('/nfts/:assetId/purchase/auth', authHandler, bodyParser(), async ctx 
         projectId: ctx.request.body.projectId,
         positionX: ctx.request.body.positionX,
         positionY: ctx.request.body.positionY,
-        price
+        price: price.toNumber()
     })
 
     const symbol = assetResponse.json.asset.params['unit-name']
