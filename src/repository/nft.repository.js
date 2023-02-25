@@ -48,8 +48,8 @@ export default class NftRepository extends DynamoDbRepository {
                 ...(asset.data && { status: asset.data.S.split('|')[2] }),
                 ...(asset.created && { created: parseInt(asset.created.N) }),
                 ...(asset.withdrawn && { archived: parseInt(asset.withdrawn.N) }),
-                ...(asset.positionX && { archived: parseInt(asset.positionX.N) }),
-                ...(asset.positionY && { archived: parseInt(asset.positionY.N) }),
+                ...(asset.positionX && { positionX: parseInt(asset.positionX.N) }),
+                ...(asset.positionY && { positionY: parseInt(asset.positionY.N) }),
                 ...(asset.offchainUrl && { offChainImageUrl: asset.offchainUrl.S })
             })),
             ...(data.nextPageKey && { nextPageKey: data.nextPageKey })
@@ -73,9 +73,10 @@ export default class NftRepository extends DynamoDbRepository {
                     created: parseInt(data.Item.created.N),
                     ...(data.Item.contractId && { contractId: data.Item.contractId.S }),
                     ...(data.Item.gsi2pk && { projectId: data.Item.gsi2pk.S.replace('project|', '') }),
+                    ...(data.Item.positionX && { positionX: parseInt(data.Item.positionX.N) }),
+                    ...(data.Item.positionY && { positionY: parseInt(data.Item.positionY.N) }),
                     ...(data.Item.withdrawn && { withdrawn: parseInt(data.Item.withdrawn.N) }),
-                    ...(data.Item.positionX && { withdrawn: parseInt(data.Item.positionX.N) }),
-                    ...(data.Item.positionY && { withdrawn: parseInt(data.Item.positionY.N) }),
+                    ...(data.Item.sold && { sold: parseInt(data.Item.sold.N) }),
                     ...(withPurchaseAuthToken && data.Item.purchaseAuthToken && { purchaseAuthToken: data.Item.purchaseAuthToken.S })
                 }
             }

@@ -217,8 +217,7 @@ router.get('/nfts/:assetId', async ctx => {
 })
 
 /* istanbul ignore next */
-// router.get('/nfts/:assetId/purchase/auth', authHandler, bodyParser(), async ctx => {
-router.get('/nfts/:assetId/purchase/auth', bodyParser(), async ctx => {
+router.post('/nfts/:assetId/purchase/auth', authHandler, bodyParser(), async ctx => {
     if (!ctx.request.body.projectId) throw new MissingParameterError('projectId')
     if (!ctx.request.body.positionX) throw new MissingParameterError('positionX')
     if (!ctx.request.body.positionY) throw new MissingParameterError('positionY')
@@ -282,18 +281,18 @@ router.get('/nfts/:assetId/purchase/auth', bodyParser(), async ctx => {
     await repository.updateNft({ assetId: ctx.params.assetId, symbol, status: 'forsale-selling', purchaseAuthToken })
 
     ctx.body = { purchaseAuthToken }
-    ctx.status = 200
+    ctx.status = 201
 })
 
 /* istanbul ignore next */
 router.put('/nfts/:assetId/purchase', bodyParser(), async ctx => {
-    if (!ctx.request.body.purchaseAuth) throw new MissingParameterError('purchaseAuth')
+    if (!ctx.request.body.purchaseAuthToken) throw new MissingParameterError('purchaseAuthToken')
 
     const repository = new NftRepository()
-    const asset = await repository.getNft(ctx.params.assetId)
-    if (asset.purchaseAuth !== ctx.request.body.purchaseAuth) throw new PurchaseUnauthorizedError()
+    const asset = await repository.getNft(ctx.params.assetId, true)
+    if (asset.purchaseAuthToken !== ctx.request.body.purchaseAuthToken) throw new PurchaseUnauthorizedError()
 
-    const { walletAddress, projectId, positionX, positionY, price } = new PurchaseAuth().getAuthMessage(asset.purchaseAuth)
+    const { walletAddress, projectId, positionX, positionY, price } = new PurchaseAuth().getAuthMessage(asset.purchaseAuthToken)
 
     // Checks all fine, start polling
 
@@ -304,7 +303,9 @@ router.put('/nfts/:assetId/purchase', bodyParser(), async ctx => {
         try {
             // eslint-disable-next-line no-inner-declarations
             async function checkOwnership() {
+                // console.log(`Waiting for ${walletAddress} to own ${ctx.params.assetId}, trying ${retries} more times`)
                 const balanceResponse = await new AlgoIndexer().callAlgonodeIndexerEndpoint(`assets/${ctx.params.assetId}/balances?currency-greater-than=0`)
+                // console.log(`Owner is ${balanceResponse.json.balances[0].address}`)
 
                 if (balanceResponse.status === 200 && balanceResponse.json.balances[0].address === walletAddress) {
                     succeed()
@@ -330,7 +331,7 @@ router.put('/nfts/:assetId/purchase', bodyParser(), async ctx => {
             assetId: ctx.params.assetId,
             symbol: asset.symbol,
             status: 'sold',
-            purchaseAuth: '.',
+            purchaseAuthToken: '.',
             projectId,
             walletAddress,
             positionX,
