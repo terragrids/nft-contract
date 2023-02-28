@@ -16,6 +16,7 @@ export const main = Reach.App(() => {
 
     const M = API('Market', {
         buy: Fun([], Transaction),
+        withdraw: Fun([], Bool),
         stop: Fun([], Bool)
     })
 
@@ -54,7 +55,7 @@ export const main = Reach.App(() => {
             }
         )
         .api(
-            M.stop,
+            M.withdraw,
             () => {
                 assume(this == A)
             },
@@ -75,9 +76,36 @@ export const main = Reach.App(() => {
 
     if (withdrawn) {
         A.interact.log('The token has been withdrawn')
-    } else {
-        A.interact.log('The token has been sold')
+        commit()
+        exit()
     }
+
+    require(balance() == 0)
+    require(balance(token) == 0)
+
+    A.interact.log('The token has been sold, waiting for end signal')
+
+    const [stopped] = parallelReduce([false])
+        .define(() => {
+            V.token.set(token)
+            V.price.set(price)
+        })
+        .invariant(balance() == 0 && balance(token) == 0)
+        .while(!stopped)
+        .api(
+            M.stop,
+            () => {
+                assume(this == A)
+            },
+            () => 0,
+            k => {
+                const isAdmin = this == A
+                require(isAdmin)
+                k(isAdmin)
+                return [true]
+            }
+        )
+        .timeout(false)
 
     A.interact.log('The market is closing down....')
 

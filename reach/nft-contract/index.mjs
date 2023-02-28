@@ -128,6 +128,25 @@ const userConnectAndBuy = async (name, account, contract, gil, ready) => {
     }
 }
 
+const userConnectAndWithdraw = async (name, account, contract, gil, ready) => {
+    return async () => {
+        console.log(`${name} is attaching to the contract...`)
+        const ctc = account.contract(backend, contract.getInfo())
+        const market = ctc.a.Market
+
+        const [algo1, gil1] = await getBalances(account, gil)
+
+        console.log(`${name} has ${fmt(algo1)}`)
+        console.log(`${name} has ${fmtToken(gil1, gil)}`)
+
+        await ready.wait()
+
+        console.log(`${name} is trying to withdraw the token...`)
+
+        await callAPI(name, () => market.withdraw(), `${name} managed to withdraw the token`, `${name} failed to withdraw the token`)
+    }
+}
+
 const userConnectAndStop = async (name, account, contract, gil, ready) => {
     return async () => {
         console.log(`${name} is attaching to the contract...`)
@@ -164,6 +183,7 @@ const testSellAndBuyAndStop = async () => {
     await Promise.all([
         thread(await userConnectAndBuy('Alice', accAlice, ctcTokenMarket, gil, ready)),
         thread(await userConnectAndBuy('Bob', accBob, ctcTokenMarket, gil, ready)),
+        thread(await userConnectAndStop('Admin', accAdmin, ctcTokenMarket, gil, sold)),
         backend.Admin(ctcTokenMarket, {
             log: (...args) => {
                 console.log(...args)
@@ -195,7 +215,7 @@ const testSellAndBuyAndStop = async () => {
     assert((parseFloat(aliceAlgo) < 90 && parseFloat(bobAlgo) > 90) || (parseFloat(bobAlgo) < 90 && parseFloat(aliceAlgo) > 90))
 }
 
-const testSellAndStop = async () => {
+const testSellAndWithdraw = async () => {
     console.log('\n>> Test sell and stop')
     const [accAdmin, accAlice, accBob, gil] = await setup()
     const ready = new Signal()
@@ -209,7 +229,7 @@ const testSellAndStop = async () => {
     const ctcTokenMarket = accAdmin.contract(backend)
 
     await Promise.all([
-        thread(await userConnectAndStop('Admin', accAdmin, ctcTokenMarket, gil, ready)),
+        thread(await userConnectAndWithdraw('Admin', accAdmin, ctcTokenMarket, gil, ready)),
         backend.Admin(ctcTokenMarket, {
             log: (...args) => {
                 console.log(...args)
@@ -244,7 +264,7 @@ const testSellAndStop = async () => {
     assert(parseFloat(aliceAlgo) > 99 && parseFloat(bobAlgo) > 99)
 }
 
-const testSellAndNonAdminStopAndBuy = async () => {
+const testSellAndNonAdminWithdrawAndBuyAndStop = async () => {
     console.log('\n>> Test sell and non-admin stop and buy')
 
     const [accAdmin, accAlice, accBob, gil] = await setup()
@@ -259,7 +279,7 @@ const testSellAndNonAdminStopAndBuy = async () => {
     const ctcTokenMarket = accAdmin.contract(backend)
 
     await Promise.all([
-        thread(await userConnectAndStop('Bob', accBob, ctcTokenMarket, gil, ready)),
+        thread(await userConnectAndWithdraw('Bob', accBob, ctcTokenMarket, gil, ready)),
         threadWithDelay(await userConnectAndBuy('Alice', accAlice, ctcTokenMarket, gil, ready), 10),
         thread(await userConnectAndStop('Admin', accAdmin, ctcTokenMarket, gil, sold)),
         backend.Admin(ctcTokenMarket, {
@@ -295,5 +315,5 @@ const testSellAndNonAdminStopAndBuy = async () => {
 }
 
 await testSellAndBuyAndStop()
-await testSellAndStop()
-await testSellAndNonAdminStopAndBuy()
+await testSellAndWithdraw()
+await testSellAndNonAdminWithdrawAndBuyAndStop()
