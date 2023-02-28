@@ -341,8 +341,28 @@ router.put('/nfts/:assetId/purchase', bodyParser(), async ctx => {
         throw new UpdateAssetStatusError(e)
     }
 
-    const deposit = Math.round(price * projectDepositPercentageOfPrice)
-    await new ProjectApi().pay(projectId, deposit)
+    try {
+        const deposit = Math.round(price * projectDepositPercentageOfPrice)
+        await new ProjectApi().pay(projectId, deposit)
+        await repository.updateNft({
+            assetId: ctx.params.assetId,
+            symbol: asset.symbol,
+            status: 'sold-paid'
+        })
+    } catch (e) {
+        // Ignore failure
+    }
+
+    try {
+        const stdlib = new ReachProvider().getStdlib()
+        const algoAccount = await stdlib.newAccountFromMnemonic(process.env.ALGO_ACCOUNT_MNEMONIC)
+        const contractInfo = getContractFromJsonString(asset.contractId)
+        const contract = algoAccount.contract(backend, contractInfo)
+        const market = contract.a.Market
+        await market.stop()
+    } catch (e) {
+        // Ignore failure
+    }
 
     ctx.body = ''
     ctx.status = 204
