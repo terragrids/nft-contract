@@ -99,8 +99,8 @@ export default class NftRepository extends DynamoDbRepository {
                     ...(purchaseAuthToken && { purchaseAuthToken: { S: purchaseAuthToken } }),
                     ...(projectId && { gsi2pk: { S: `project|${projectId}` } }),
                     ...(walletAddress && { gsi3pk: { S: `user|${walletAddress}` } }),
-                    ...(positionX && { positionX: { N: positionX.toString() } }),
-                    ...(positionY && { positionY: { N: positionY.toString() } }),
+                    ...(positionX !== undefined && { positionX: { N: positionX.toString() } }),
+                    ...(positionY != undefined && { positionY: { N: positionY.toString() } }),
                     ...(status === 'sold' && { sold: { N: now.toString() } })
                 },
                 itemLogName: this.itemName

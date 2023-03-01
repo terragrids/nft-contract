@@ -147,6 +147,7 @@ router.post('/nfts', authHandler, bodyParser(), async ctx => {
                         fail(e)
                     }
                 },
+                onSoldOrWithdrawn: () => {},
                 token: tokenId,
                 wallet: managerAddress,
                 price
@@ -219,8 +220,8 @@ router.get('/nfts/:assetId', async ctx => {
 /* istanbul ignore next */
 router.post('/nfts/:assetId/purchase/auth', authHandler, bodyParser(), async ctx => {
     if (!ctx.request.body.projectId) throw new MissingParameterError('projectId')
-    if (!ctx.request.body.positionX) throw new MissingParameterError('positionX')
-    if (!ctx.request.body.positionY) throw new MissingParameterError('positionY')
+    if (!ctx.request.body.positionX === undefined) throw new MissingParameterError('positionX')
+    if (!ctx.request.body.positionY === undefined) throw new MissingParameterError('positionY')
 
     const algoIndexer = new AlgoIndexer()
     const repository = new NftRepository()

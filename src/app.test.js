@@ -308,9 +308,10 @@ describe('app', function () {
             cidFromAlgorandAddress.mockImplementation(() => 'cid')
 
             const adminInterface = {
-                Admin: ({ log, onReady }) => {
+                Admin: ({ log, onReady, onSoldOrWithdrawn }) => {
                     log('ready')
                     onReady('contract')
+                    onSoldOrWithdrawn('onSoldOrWithdrawn')
                 }
             }
             const adminSpy = jest.spyOn(adminInterface, 'Admin')
