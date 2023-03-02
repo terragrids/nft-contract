@@ -77,6 +77,7 @@ export default class NftRepository extends DynamoDbRepository {
                     ...(data.Item.positionY && { positionY: parseInt(data.Item.positionY.N) }),
                     ...(data.Item.withdrawn && { withdrawn: parseInt(data.Item.withdrawn.N) }),
                     ...(data.Item.sold && { sold: parseInt(data.Item.sold.N) }),
+                    ...(data.Item.lastSalePrice && { lastSalePrice: parseInt(data.Item.lastSalePrice.N) }),
                     ...(withPurchaseAuthToken && data.Item.purchaseAuthToken && { purchaseAuthToken: data.Item.purchaseAuthToken.S })
                 }
             }
@@ -88,7 +89,7 @@ export default class NftRepository extends DynamoDbRepository {
         }
     }
 
-    async updateNft({ assetId, symbol, status, purchaseAuthToken, projectId, walletAddress, positionX, positionY }) {
+    async updateNft({ assetId, symbol, status, purchaseAuthToken, projectId, walletAddress, positionX, positionY, lastSalePrice }) {
         try {
             const now = Date.now()
 
@@ -101,7 +102,8 @@ export default class NftRepository extends DynamoDbRepository {
                     ...(walletAddress && { gsi3pk: { S: `user|${walletAddress}` } }),
                     ...(positionX !== undefined && { positionX: { N: positionX.toString() } }),
                     ...(positionY != undefined && { positionY: { N: positionY.toString() } }),
-                    ...(status === 'sold' && { sold: { N: now.toString() } })
+                    ...(status === 'sold' && { sold: { N: now.toString() } }),
+                    ...(lastSalePrice && { lastSalePrice: { N: now.toString() } })
                 },
                 itemLogName: this.itemName
             })

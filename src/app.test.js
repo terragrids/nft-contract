@@ -12,7 +12,8 @@ const mockStdlib = {
     algosdk: jest.fn().mockImplementation(() => jest.fn()),
     makeAssetConfigTxnWithSuggestedParamsFromObject: jest.fn().mockImplementation(() => jest.fn()),
     waitForConfirmation: jest.fn().mockImplementation(() => jest.fn()),
-    tokensAccepted: jest.fn().mockImplementation(() => jest.fn())
+    tokensAccepted: jest.fn().mockImplementation(() => jest.fn()),
+    parseCurrency: jest.fn().mockImplementation(() => jest.fn())
 }
 
 jest.mock('./provider/reach-provider.js', () =>
@@ -26,6 +27,7 @@ jest.mock('./provider/reach-provider.js', () =>
             formatAddress: mockStdlib.formatAddress,
             launchToken: mockStdlib.launchToken,
             tokensAccepted: mockStdlib.tokensAccepted,
+            parseCurrency: mockStdlib.parseCurrency,
             algosdk: {
                 makeAssetConfigTxnWithSuggestedParamsFromObject: mockStdlib.makeAssetConfigTxnWithSuggestedParamsFromObject,
                 waitForConfirmation: mockStdlib.waitForConfirmation
@@ -304,6 +306,8 @@ describe('app', function () {
                 id: { toNumber: () => 1234 }
             }))
 
+            mockStdlib.parseCurrency.mockImplementation(() => 123)
+
             algorandAddressFromCID.mockImplementation(() => ({ address: 'reserve_address', url: 'token_url' }))
             cidFromAlgorandAddress.mockImplementation(() => 'cid')
 
@@ -371,13 +375,16 @@ describe('app', function () {
                 id: { toNumber: () => 1234 }
             }))
 
+            mockStdlib.parseCurrency.mockImplementation(() => 123)
+
             algorandAddressFromCID.mockImplementation(() => ({ address: 'reserve_address', url: 'token_url' }))
             cidFromAlgorandAddress.mockImplementation(() => 'cid')
 
             const adminInterface = {
-                Admin: ({ log, onReady }) => {
+                Admin: ({ log, onReady, onSoldOrWithdrawn }) => {
                     log('ready')
                     onReady('contract')
+                    onSoldOrWithdrawn()
                 }
             }
             const adminSpy = jest.spyOn(adminInterface, 'Admin')

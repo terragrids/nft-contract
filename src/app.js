@@ -150,7 +150,7 @@ router.post('/nfts', authHandler, bodyParser(), async ctx => {
                 onSoldOrWithdrawn: () => {},
                 token: tokenId,
                 wallet: managerAddress,
-                price
+                price: stdlib.parseCurrency(price)
             })
         } catch (e) {
             fail(e)
@@ -196,7 +196,23 @@ router.get('/nfts', async ctx => {
 router.get('/nfts/:assetId', async ctx => {
     const asset = await new NftRepository().getNft(ctx.params.assetId)
 
-    // TODO Validate contract if it is for sale
+    let price
+    const stdlib = new ReachProvider().getStdlib()
+
+    /* istanbul ignore next */
+    if (asset.status.startsWith('forsale') && asset.contractId) {
+        try {
+            const algoAccount = await stdlib.newAccountFromMnemonic(process.env.ALGO_ACCOUNT_MNEMONIC)
+            const contractInfo = getContractFromJsonString(asset.contractId)
+            const contract = algoAccount.contract(backend, contractInfo)
+            const view = contract.v.View
+            const tokenId = (await view.token())[1].toNumber()
+            if (tokenId !== Number(ctx.params.assetId)) throw Error('Contract token not matching')
+            price = (await view.price())[1].toNumber()
+        } catch (e) {
+            throw new ReadContractError(e)
+        }
+    }
 
     const algoIndexer = new AlgoIndexer()
 
@@ -209,8 +225,11 @@ router.get('/nfts/:assetId', async ctx => {
 
     if (indexerResults.some(result => result.status !== 200) || indexerResults[0].json.asset.deleted) throw new NotFoundError()
 
+    /* istanbul ignore next */
     ctx.body = {
         ...asset,
+        ...(price && { price: stdlib.formatCurrency(price, 4) }),
+        ...(asset.lastSalePrice && { lastSalePrice: stdlib.formatCurrency(asset.lastSalePrice, 4) }),
         url: indexerResults[0].json.asset.params.url,
         reserve: indexerResults[0].json.asset.params.reserve,
         holders: indexerResults[1].json.balances.map(balance => ({ address: balance.address, amount: balance.amount }))
@@ -333,6 +352,7 @@ router.put('/nfts/:assetId/purchase', bodyParser(), async ctx => {
             symbol: asset.symbol,
             status: 'sold',
             purchaseAuthToken: '.',
+            lastSalePrice: price,
             projectId,
             walletAddress,
             positionX,
