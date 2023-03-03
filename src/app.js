@@ -166,12 +166,11 @@ router.post('/nfts', authHandler, bodyParser(), async ctx => {
 })
 
 router.get('/nfts', async ctx => {
-    if (!ctx.request.query.symbol) throw new MissingParameterError('symbol')
-
     const dbResponse = await new NftRepository().getNfts({
-        symbol: ctx.request.query.symbol.toUpperCase(),
+        symbol: ctx.request.query.symbol,
         sort: ctx.request.query.sort,
         status: ctx.request.query.status,
+        projectId: ctx.request.query.projectId,
         pageSize: ctx.request.query.pageSize,
         nextPageKey: ctx.request.query.nextPageKey
     })

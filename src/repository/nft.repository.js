@@ -22,24 +22,43 @@ export default class NftRepository extends DynamoDbRepository {
         })
     }
 
-    async getNfts({ symbol, status, pageSize, nextPageKey, sort }) {
+    async getNfts({ symbol, status, projectId, pageSize, nextPageKey, sort }) {
         const forward = sort && sort === 'desc' ? false : true
-        let condition = 'gsi1pk = :gsi1pk'
-        if (status) {
+        let condition = projectId ? 'gsi2pk = :gsi2pk' : 'gsi1pk = :gsi1pk'
+
+        if (status && symbol) {
+            symbol = symbol.toUpperCase()
             condition = `${condition} AND begins_with(#data, :status)`
         }
-        const data = await this.query({
-            indexName: 'gsi1',
-            conditionExpression: condition,
-            ...(status && { attributeNames: { '#data': 'data' } }),
-            attributeValues: {
-                ':gsi1pk': { S: `symbol|${symbol}` },
-                ...(status && { ':status': { S: `asset|${symbol}|${status}` } })
-            },
-            pageSize,
-            nextPageKey,
-            forward
-        })
+
+        let data
+        if (projectId) {
+            data = await this.query({
+                indexName: 'gsi2',
+                conditionExpression: condition,
+                ...(status && { attributeNames: { '#data': 'data' } }),
+                attributeValues: {
+                    ':gsi2pk': { S: `project|${projectId}` },
+                    ...(status && symbol && { ':status': { S: `asset|${symbol}|${status}` } })
+                },
+                pageSize,
+                nextPageKey,
+                forward
+            })
+        } else {
+            data = await this.query({
+                indexName: 'gsi1',
+                conditionExpression: condition,
+                ...(status && { attributeNames: { '#data': 'data' } }),
+                attributeValues: {
+                    ':gsi1pk': { S: `symbol|${symbol}` },
+                    ...(status && symbol && { ':status': { S: `asset|${symbol}|${status}` } })
+                },
+                pageSize,
+                nextPageKey,
+                forward
+            })
+        }
 
         return {
             assets: data.items.map(asset => ({
